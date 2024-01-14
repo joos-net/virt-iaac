@@ -15,8 +15,7 @@
 - [Packer](https://github.com/netology-code/devops-materials/blob/master/README.md) версии 1.9.х + плагин от Яндекс Облако по [инструкции](https://cloud.yandex.ru/docs/tutorials/infrastructure-management/packer-quickstart)
 - [уandex cloud cli](https://cloud.yandex.com/ru/docs/cli/quickstart) Так же инициализируйте профиль с помощью ```yc init``` .
 
-
-Примечание: Облачная ВМ с Linux в данной задаче не подойдёт из-за ограничений облачного провайдера. У вас просто не установится virtualbox.
+![soft](https://github.com/joos-net/virt-iaac/blob/main/virt21.png)
 
 ## Задача 2
 
@@ -27,35 +26,52 @@
 docker version && docker compose version
 ```
 
-3. Если Vagrant выдаёт ошибку (блокировка трафика):
-```
-URL: ["https://vagrantcloud.com/bento/ubuntu-20.04"]     
-Error: The requested URL returned error: 404:
-```
-
-Выполните следующие действия:
-
-- Скачайте с [сайта](https://app.vagrantup.com/bento/boxes/ubuntu-20.04) файл-образ "bento/ubuntu-20.04".
-- Добавьте его в список образов Vagrant: "vagrant box add bento/ubuntu-20.04 <путь к файлу>".
-
-**Важно:**    
-- Если ваша хостовая рабочая станция - это windows ОС, то у вас могут возникнуть проблемы со вложенной виртуализацией. Ознакомиться со cпособами решения можно [по ссылке](https://www.comss.ru/page.php?id=7726).
-
-- Если вы устанавливали hyper-v или docker desktop, то  все равно может возникать ошибка:  
-`Stderr: VBoxManage: error: AMD-V VT-X is not available (VERR_SVM_NO_SVM)`   
- Попробуйте в этом случае выполнить в Windows от администратора команду `bcdedit /set hypervisorlaunchtype off` и перезагрузиться.
-
-- Если ваша рабочая станция в меру различных факторов не может запустить вложенную виртуализацию - допускается неполное выполнение(до ошибки запуска ВМ)
+![vagrant-docker](https://github.com/joos-net/virt-iaac/blob/main/virt25.png)
 
 ## Задача 3
 
-1. Отредактируйте файл    или  [mydebian.json.pkr.hcl](https://github.com/netology-code/virtd-homeworks/blob/shvirtd-1/05-virt-02-iaac/src/mydebian.json.pkr.hcl)  в директории src (packer умеет и в json, и в hcl форматы):
+1. Отредактируйте файл или  [mydebian.json.pkr.hcl](https://github.com/netology-code/virtd-homeworks/blob/shvirtd-1/05-virt-02-iaac/src/mydebian.json.pkr.hcl)  в директории src (packer умеет и в json, и в hcl форматы):
    - добавьте в скрипт установку docker (возьмите готовый bash-скрипт из [Vagrantfile](https://github.com/netology-code/virtd-homeworks/blob/shvirtd-1/05-virt-02-iaac/src/Vagrantfile)  или  [документации]( https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)  к docker), 
    - дополнительно установите в данном образе htop и tmux.(не забудьте про ключ автоматического подтверждения установки для apt)
-3. Найдите свой образ в web консоли yandex_cloud
+3. Найдите свой образ в web консоли yandex_cloud 
+![yc-web](https://github.com/joos-net/virt-iaac/blob/main/virt23.png)
 4. Необязательное задание(*): найдите в документации yandex cloud как найти свой образ с помощью утилиты командной строки "yc cli".
+![yc-console](https://github.com/joos-net/virt-iaac/blob/main/virt24.png)
 5. Создайте новую ВМ (минимальные параметры) в облаке, используя данный образ.
 6. Подключитесь по ssh и убедитесь в наличии установленного docker.
+![yc-docker](https://github.com/joos-net/virt-iaac/blob/main/virt22.png)
 7. Удалите ВМ и образ.
 8. **ВНИМАНИЕ!** Никогда не выкладываете oauth token от облака в git-репозиторий! Утечка секретного токена может привести к финансовым потерям. После выполнения задания обязательно удалите секретные данные из файла mydebian.json и mydebian.json.pkr.hcl. (замените содержимое токена на  "ххххх")
 9. В качестве ответа на задание  загрузите результирующий файл в ваш ЛК.
+
+```hcl
+source "yandex" "debian_docker" {
+  disk_type           = "network-hdd"
+  folder_id           = "b1gh"
+  image_description   = "my custom debian with docker"
+  image_name          = "debian-11-docker"
+  source_image_family = "debian-11"
+  ssh_username        = "debian"
+  subnet_id           = "e9b0"
+  token               = "y0"
+  use_ipv4_nat        = true
+  zone                = "ru-central1-a"
+}
+
+build {
+  sources = ["source.yandex.debian_docker"]
+  provisioner "shell" {
+    inline = [
+        "echo 'hello from packer'",
+        "sudo apt-get update",
+        "sudo apt-get install -y ca-certificates curl gnupg htop tmux",
+        "sudo install -m 0755 -d /etc/apt/keyrings",
+        # Docker
+        "curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-keyring.gpg",
+        "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable\" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null",
+        "sudo apt-get update",
+        "sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+        ]
+  }
+}
+```
